@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient; // Updated Import
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,10 +21,13 @@ import java.util.stream.Collectors;
 public class PredictionService {
 
     private final CycleRepository cycleRepository;
-    private final RestClient restClient; // Swapped to RestClient
+    private final RestClient restClient;
 
     @Value("${ai.service.url}")
     private String aiServiceUrl;
+
+    @Value("${ai.service.secret}")
+    private String aiServiceSecret; // <-- Make sure this is injected!
 
     // Threshold: less than 3 cycles → use math. 3 or more → call AI
     private static final int AI_THRESHOLD = 3;
@@ -65,9 +68,9 @@ public class PredictionService {
 
         int avgLength = lengths.isEmpty() ? 28
                 : (int) lengths.stream()
-                        .mapToInt(Integer::intValue)
-                        .average()
-                        .orElse(28);
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(28);
 
         LocalDate predictedStart = lastStart.plusDays(avgLength);
 
@@ -110,12 +113,13 @@ public class PredictionService {
                 "last_start_date", lastStart.toString()
         );
 
-        // Updated API call using RestClient
+        // Updated API call using RestClient WITH the secret header
         Map<String, Object> aiResponse = restClient.post()
                 .uri(aiServiceUrl + "/predict")
+                .header("x-internal-secret", aiServiceSecret) // <-- FIX APPLIED HERE
                 .body(requestBody)
                 .retrieve()
-                .body(Map.class); // Automatically parses JSON into a Map
+                .body(Map.class);
 
         if (aiResponse == null) {
             throw new RuntimeException("Empty response from AI service");

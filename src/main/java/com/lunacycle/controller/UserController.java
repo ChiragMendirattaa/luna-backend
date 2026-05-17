@@ -1,16 +1,19 @@
 package com.lunacycle.controller;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.lunacycle.model.User;
 import com.lunacycle.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -28,6 +31,10 @@ public class UserController {
                 .orElseThrow(() ->
                         new EntityNotFoundException("User not found"));
 
+        // 🚨 This log will prove exactly what React sent!
+        log.info("Received update for user {}: cycleLength={}, onboardingDone={}",
+                userId, request.getAverageCycleLength(), request.getOnboardingDone());
+
         if (request.getAverageCycleLength() != null) {
             user.setAverageCycleLength(request.getAverageCycleLength());
         }
@@ -42,6 +49,7 @@ public class UserController {
     @Data
     static class UpdateMeRequest {
         private Integer averageCycleLength;
+        @JsonProperty("onboardingDone")
         private Boolean onboardingDone;
     }
 }

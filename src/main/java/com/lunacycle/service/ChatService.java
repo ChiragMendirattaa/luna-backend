@@ -7,9 +7,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient; // 1. Swapped to RestClient
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatService {
 
-    private final RestClient restClient; // 2. Injected RestClient instead
+    private final RestClient restClient;
     private final CycleRepository cycleRepository;
     private final SymptomRepository symptomRepository;
 
@@ -35,15 +36,14 @@ public class ChatService {
         // Build cycle summary from user's data
         var cycles = cycleRepository.findByUserIdOrderByStartDateDesc(userId);
 
-        // 3. Fixed the double-to-int cast for String.format("%d")
         String cycleSummary = cycles.isEmpty() ? "" :
                 String.format("Last period: %s. Average cycle: %d days.",
                         cycles.get(0).getStartDate(),
                         (int) cycles.stream()
-                              .filter(c -> c.getCycleLengthDays() != null)
-                              .mapToInt(c -> c.getCycleLengthDays())
-                              .average()
-                              .orElse(28.0));
+                                .filter(c -> c.getCycleLengthDays() != null)
+                                .mapToInt(c -> c.getCycleLengthDays())
+                                .average()
+                                .orElse(28.0));
 
         // Fetch last 14 days of symptoms for context
         var recentSymptoms = symptomRepository
@@ -57,20 +57,32 @@ public class ChatService {
                 .map(s -> Map.<String, Object>of(
                         "date",     s.getLoggedDate().toString(),
                         "type",     s.getType().toString(),
-                        "severity", s.getSeverity() != null
-                                ? s.getSeverity() : 2
+                        "severity", s.getSeverity() != null ? s.getSeverity() : 2
                 ))
                 .collect(Collectors.toList());
 
-        // Forward to Python AI service
+        // Build payload — include conversation history if provided
+        List<Map<String, String>> conversationHistory = new ArrayList<>();
+        if (request.getConversationHistory() != null) {
+            // Take last 10 messages max to avoid token bloat
+            List<ChatDto.ConversationMessage> hist = request.getConversationHistory();
+            int start = Math.max(0, hist.size() - 10);
+            for (ChatDto.ConversationMessage msg : hist.subList(start, hist.size())) {
+                conversationHistory.add(Map.of(
+                        "role",    msg.getRole(),
+                        "content", msg.getContent()
+                ));
+            }
+        }
+
         Map<String, Object> payload = Map.of(
-                "message",         request.getMessage(),
-                "cycle_summary",   cycleSummary,
-                "symptom_history", symptomHistory
+                "message",              request.getMessage(),
+                "cycle_summary",        cycleSummary,
+                "symptom_history",      symptomHistory,
+                "conversation_history", conversationHistory
         );
 
         try {
-            // 4. Updated to use the clean RestClient syntax
             Map<?, ?> response = restClient.post()
                     .uri(aiServiceUrl + "/chat")
                     .header("x-internal-secret", aiServiceSecret)
