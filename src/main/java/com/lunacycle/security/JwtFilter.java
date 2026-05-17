@@ -39,6 +39,12 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 // Set RLS context so Supabase policies enforce per-user data isolation
                 request.setAttribute("currentUserId", userId);
+            } else {
+                // Token present but invalid/expired → return 401 explicitly
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\": \"Token expired or invalid\"}");
+                return;
             }
         }
 

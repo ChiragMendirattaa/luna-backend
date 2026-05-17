@@ -1,5 +1,6 @@
 package com.lunacycle.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +17,7 @@ public class CycleDto {
 
         private LocalDate endDate;
         private String notes;
+        @JsonProperty("onboardingSeed")
         private boolean onboardingSeed = false;
     }
 
